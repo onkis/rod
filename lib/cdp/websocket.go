@@ -3,6 +3,7 @@ package cdp
 import (
 	"bufio"
 	"context"
+	"crypto/rand"
 	"crypto/sha1"
 	"encoding/base64"
 	"fmt"
@@ -193,8 +194,26 @@ func verifyWebSocketAccept(responseHeaders http.Header, websocketKey string) boo
 	return responseHeaders.Get("Sec-WebSocket-Accept") == expectedAccept
 }
 
+// Thank you https://dev.to/hgsgtk/how-decided-a-value-set-in-sec-websocket-keyaccept-header-l79
+func generateKey() (string, error) {
+	// 1. 16-byte value
+	p := make([]byte, 16)
+
+	// 2. Randomly selected
+	if _, err := io.ReadFull(rand.Reader, p); err != nil {
+		return "", err
+	}
+
+	// 3. Base64-encoded
+	return base64.StdEncoding.EncodeToString(p), nil
+}
+
 func (ws *WebSocket) handshake(ctx context.Context, u *url.URL, header http.Header) error {
-	defaultSecKey := "nil"
+	defaultSecKey, keyErr := generateKey()
+	if keyErr != nil {
+		return keyErr
+	}
+
 	req := (&http.Request{Method: http.MethodGet, URL: u, Header: http.Header{
 		"Upgrade":               {"websocket"},
 		"Connection":            {"Upgrade"},
